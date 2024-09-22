@@ -1,0 +1,116 @@
+import ballerina/grpc;
+import ballerina/log;
+
+
+// In-memory storage for users, products, carts, and orders
+map<Product> products = {};
+map<User> users = {};
+map<CartItem[]> carts = {};
+map<Order> orders = {};
+
+//the ShoppingService
+service "ShoppingService" on new grpc:Listener(9090) {
+
+    // Add a product
+    remote function addProduct(AddProductRequest request) returns AddProductResponse|error {
+        string sku = request.sku;
+        Product newProduct = {
+            name: request.name,
+            description: request.description,
+            price: request.price,
+            stock_quantity: request.stock_quantity,
+            sku: sku,
+            status: request.status
+        };
+        products[sku] = newProduct;
+        log:printInfo("Added product with SKU: " + sku);
+        return { product_code: sku };
+    }
+
+    // Create multiple users
+    remote function createUsers(stream<CreateUserRequest, error?> clientStream) returns CreateUsersResponse|error {
+        string[] createdUserIds = [];
+        check from CreateUserRequest userRequest in clientStream {
+            string userId = userRequest.user_id;
+            users[userId] = { user_id: userId, user_type: userRequest.user_type };
+            createdUserIds.push(userId);
+        };
+        log:printInfo("Created users successfully");
+        return { user_ids: createdUserIds };
+    }
+
+    // Update a product
+    remote function updateProduct(UpdateProductRequest request) returns UpdateProductResponse|error {
+        string sku = request.sku;
+        Product? existingProduct = products[sku];
+        if existingProduct is Product {
+            products[sku] = {
+                name: request.name,
+                description: request.description,
+                price: request.price,
+                stock_quantity: request.stock_quantity,
+                sku: sku,
+                status: request.status
+            };
+            log:printInfo("Updated product: " + sku);
+            return { product_code: sku };
+        } else {
+            return error("Product not found");
+        }
+    }
+
+    // Remove a product
+    remote function removeProduct(RemoveProductRequest request) returns RemoveProductResponse|error {
+        products.remove(request.product_code);
+        log:printInfo("Removed product: " + request.product_code);
+        string[] remainingProductCodes = products.keys();
+        return { product_codes: remainingProductCodes };
+    }
+
+    // List available products
+    remote function listAvailableProducts(ListAvailableProductsRequest request) returns ListAvailableProductsResponse|error {
+        Product[] availableProducts = [];
+        foreach Product product in products {
+            if product.status == true {
+                availableProducts.push(product);
+            }
+        }
+        return { products: availableProducts };
+    }
+
+    // Search for a product by SKU
+    remote function searchProduct(SearchProductRequest request) returns SearchProductResponse|error {
+        Product? product = products[request.sku];
+        if product is Product {
+            return { product: product };
+        } else {
+            return error("Product not found");
+        }
+    }
+
+    // Add a product to the cart
+    remote function addToCart(AddToCartRequest request) returns AddToCartResponse|error {
+        CartItem cartItem = { sku: request.product_sku, quantity: 1 };
+        carts[request.user_id] = carts.get(request.user_id, []) + cartItem;
+        string cartId = request.user_id + "-cart";
+        log:printInfo("Added to cart for user: " + request.user_id);
+        return { cart_id: cartId };
+    }
+
+    // Place an order
+    remote function placeOrder(PlaceOrderRequest request) returns PlaceOrderResponse|error {
+        CartItem[] userCart = carts[request.user_id];
+        if userCart.length() == 0 {
+            return error("Cart is empty");
+        }
+        Order newOrder = {
+            order_id: uuid:createType4AsString(),
+            user_id: request.user_id,
+            items: userCart
+        };
+        orders[newOrder.order_id] = newOrder;
+        carts.remove(request.user_id);  // Clear the cart after placing an order
+        log:printInfo("Order placed for user: " + request.user_id);
+        return { order_id: newOrder.order_id };
+    }
+}
