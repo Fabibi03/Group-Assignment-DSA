@@ -1,0 +1,206 @@
+
+import ballerina/io;
+import ballerina/random;
+
+map<Product> products = {};
+map<User> users = {};
+map<Cart> carts = {};
+
+type Product record {
+    string sku;
+    string name;
+    string description;
+    float price;
+    int stock_quantity;
+    boolean status; // true means available, false means unavailable
+};
+
+type User record {
+    string user_id;
+    string user_type;
+};
+
+type Cart record {
+    string user_id;
+    map<int> items; // SKU -> Quantity
+};
+
+function generateSKU() returns string {
+    return string ${check random:createIntInRange(1000, 9999)}-${check random:createIntInRange(1000, 9999)}-${check random:createIntInRange(1000, 9999)};
+}
+
+public function main() {
+    string continueWorking = "y";
+
+    while continueWorking.equalsIgnoreCaseAscii("y") {
+        io:println("1. Add product");
+        io:println("2. Create users");
+        io:println("3. Update product");
+        io:println("4. Remove product");
+        io:println("5. List available products");
+        io:println("6. Search product");
+        io:println("7. Add to cart");
+        io:println("8. Place order");
+        
+        string choice = io:readln("Enter a choice to perform an action: ");
+        
+        if choice == "1" {
+            // Add Product
+            string name = io:readln("Enter the product name: ");
+            string description = io:readln("Enter the product description: ");
+            string priceStr = io:readln("Enter the product price: ");
+            string quantityStr = io:readln("Enter the stock quantity: ");
+            float price = check 'float:fromString(priceStr);
+            int stockQuantity = check 'int:fromString(quantityStr);
+            string sku = generateSKU();
+
+            Product newProduct = {
+                sku: sku,
+                name: name,
+                description: description,
+                price: price,
+                stock_quantity: stockQuantity,
+                status: true
+            };
+            products[sku] = newProduct;
+
+            io:println("Product added with SKU: " + sku);
+
+        } else if choice == "2" {
+            // Create Users
+            string another = "y";
+
+            while another.equalsIgnoreCaseAscii("y") {
+                string userId = io:readln("Enter the user ID: ");
+                string userType = io:readln("Enter the user type (e.g., CUSTOMER): ");
+                
+                User newUser = {user_id: userId, user_type: userType};
+                users[userId] = newUser;
+
+                another = io:readln("Would you like to add another user? (y/n): ");
+            }
+
+            io:println("Users created: " + users.keys().toString());
+
+        } else if choice == "3" {
+            // Update Product
+            string sku = io:readln("Enter the SKU of the product to update: ");
+            
+            if products.hasKey(sku)) {
+                Product product = products[sku];
+                string name = io:readln("Enter new product name (leave blank to keep unchanged): ");
+                string description = io:readln("Enter new product description (leave blank to keep unchanged): ");
+                string priceStr = io:readln("Enter new price (leave blank to keep unchanged): ");
+                string stockQuantityStr = io:readln("Enter new stock quantity (leave blank to keep unchanged): ");
+                string statusStr = io:readln("Enter product status (true/false, leave blank to keep unchanged): ");
+
+                product.name = name != "" ? name : product.name;
+                product.description = description != "" ? description : product.description;
+                product.price = priceStr != "" ? check float:fromString(priceStr) : product.price;
+                product.stock_quantity = stockQuantityStr != "" ? check int:fromString(stockQuantityStr) : product.stock_quantity;
+                product.status = statusStr != "" ? check boolean:fromString(statusStr) : product.status;
+
+                products[sku] = product;
+                io:println("Updated product with SKU: " + sku);
+            } else {
+                io:println("Product not found.");
+            }
+
+        } else if choice == "4" {
+            // Remove Product
+            string sku = io:readln("Enter the SKU of the product to remove: ");
+            if products.hasKey(sku)) {
+                products.remove(sku);
+                io:println("Product with SKU: " + sku + " removed.");
+            } else {
+                io:println("Product not found.");
+            }
+
+        } else if choice == "5" {
+            // List Available Products
+            foreach Product product in products.values() {
+                if product.status {
+                    io:println("Product SKU: " + product.sku + " | Name: " + product.name);
+                    io:println("Description: " + product.description);
+                    io:println(string Price: ${product.price} | Stock: ${product.stock_quantity});
+                }
+            }
+
+        } else if choice == "6" {
+            // Search Product by SKU
+            string sku = io:readln("Enter the SKU of the product to search: ");
+            if products.hasKey(sku)) {
+                Product product = products[sku];
+                io:println("Product SKU: " + product.sku + " | Name: " + product.name);
+                io:println("Description: " + product.description);
+                io:println(string Price: ${product.price} | Stock: ${product.stock_quantity});
+            } else {
+                io:println("Product not found.");
+            }
+
+        } else if choice == "7" {
+            // Add to Cart
+            string userId = io:readln("Enter your user ID: ");
+            if !users.hasKey(userId) {
+                io:println("User not found.");
+                continue;
+            }
+
+            string sku = io:readln("Enter the SKU of the product to add to cart: ");
+            if !products.hasKey(sku)) {
+                io:println("Product not found.");
+                continue;
+            }
+
+            string quantityStr = io:readln("Enter the quantity: ");
+            int quantity = check 'int:fromString(quantityStr);
+
+            if products[sku].stock_quantity < quantity {
+                io:println("Not enough stock for product SKU: " + sku);
+                continue;
+            }
+
+            if carts.hasKey(userId)) {
+                Cart cart = carts[userId];
+                if cart.items.hasKey(sku) {
+                    cart.items[sku] += quantity;
+                } else {
+                    cart.items[sku] = quantity;
+                }
+                carts[userId] = cart;
+            } else {
+                map<int> cartItems = {sku: quantity};
+                carts[userId] = {user_id: userId, items: cartItems};
+            }
+
+            io:println("Added product to cart.");
+
+        } else if choice == "8" {
+            // Place Order
+            string userId = io:readln("Enter your user ID to place an order: ");
+            if !carts.hasKey(userId) {
+                io:println("Cart not found for user.");
+                continue;
+            }
+
+            Cart cart = carts[userId];
+            float total = 0.0;
+
+            foreach var [sku, quantity] in cart.items.entries() {
+                if products[sku].stock_quantity >= quantity {
+                    float price = products[sku].price;
+                    total += price * quantity;
+                    products[sku].stock_quantity -= quantity;
+                } else {
+                    io:println("Not enough stock for SKU: " + sku);
+                    continue;
+                }
+            }
+
+            io:println("Order placed. Total: " + total.toString());
+            carts.remove(userId); // Clear cart after order
+        }
+
+        continueWorking = io:readln("Would you like to continue? (y/n): ");
+    }
+}
