@@ -1,0 +1,117 @@
+import ballerina/http;
+import ballerina/log;
+
+type Course record {
+    string courseName;
+    string courseCode;
+    string nqfLevel;
+};
+
+type Programme record {
+    string programmeCode;
+    string nqfLevel;
+    string facultyName;
+    string departmentName;
+    string title;
+    string registrationDate;
+    Course[] courses;
+};
+
+// Create an HTTP client to interact with the API
+http:Client apiClient = new("http://localhost:8080/programmes");
+
+public function main() returns error? {
+    // Example: Add a new programme
+    Programme newProgramme = {
+        programmeCode: "CS101",
+        nqfLevel: "NQF Level 7",
+        facultyName: "Faculty of Computing",
+        departmentName: "Department of Computer Science",
+        title: "Bachelor of Computer Science",
+        registrationDate: "2024-01-01",
+        courses: [
+            {courseName: "Introduction to Programming", courseCode: "CS101A", nqfLevel: "NQF Level 5"},
+            {courseName: "Data Structures", courseCode: "CS102A", nqfLevel: "NQF Level 6"}
+        ]
+    };
+
+    // Add a new programme
+    var response = apiClient->post("/addProgramme", newProgramme);
+    if (response is json) {
+        log:printInfo("Response from addProgramme: " + response.toString());
+    } else {
+        log:printError("Error occurred while adding programme: ", response);
+    }
+
+    // Retrieve a list of all programmes
+    response = apiClient->get("/all");
+    if (response is Programme[]) {
+        log:printInfo("List of all programmes:");
+        foreach Programme prog in response {
+            log:printInfo(prog.toString());
+        }
+    } else {
+        log:printError("Error occurred while retrieving programmes: ", response);
+    }
+
+    // Update an existing programme's information
+    Programme updatedProgramme = {
+        programmeCode: "CS101",
+        nqfLevel: "NQF Level 8",
+        facultyName: "Faculty of Computing",
+        departmentName: "Department of Computer Science",
+        title: "Bachelor of Computer Science (Honours)",
+        registrationDate: "2024-01-01",
+        courses: [
+            {courseName: "Introduction to Programming", courseCode: "CS101A", nqfLevel: "NQF Level 5"},
+            {courseName: "Data Structures", courseCode: "CS102A", nqfLevel: "NQF Level 6"}
+        ]
+    };
+
+    // Update the programme
+    response = apiClient->put("/updateProgramme/CS101", updatedProgramme);
+    if (response is json) {
+        log:printInfo("Response from updateProgramme: " + response.toString());
+    } else {
+        log:printError("Error occurred while updating programme: ", response);
+    }
+
+    // Retrieve details of a specific programme by programme code
+    response = apiClient->get("/details/CS101");
+    if (response is Programme) {
+        log:printInfo("Details of programme CS101: " + response.toString());
+    } else {
+        log:printError("Error occurred while retrieving programme details: ", response);
+    }
+
+    // Delete a programme's record by programme code
+    response = apiClient->delete("/deleteProgramme/CS101");
+    if (response is json) {
+        log:printInfo("Response from deleteProgramme: " + response.toString());
+    } else {
+        log:printError("Error occurred while deleting programme: ", response);
+    }
+
+    // Retrieve all programmes that are due for review
+    response = apiClient->get("/dueForReview");
+    if (response is Programme[]) {
+        log:printInfo("Programmes due for review:");
+        foreach Programme prog in response {
+            log:printInfo(prog.toString());
+        }
+    } else {
+        log:printError("Error occurred while retrieving programmes due for review:", response);
+    }
+
+   // Retrieve all programmes belonging to a specific faculty
+   string facultyName = "Faculty of Computing";
+   response = apiClient->get("/byFaculty/" + facultyName);
+   if (response is Programme[]) {
+       log:printInfo("Programmes in Faculty of Computing:");
+       foreach Programme prog in response {
+           log:printInfo(prog.toString());
+       }
+   } else {
+       log:printError("Error occurred while retrieving programmes by faculty:", response);
+   }
+}
