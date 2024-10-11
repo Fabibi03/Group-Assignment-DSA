@@ -9,7 +9,7 @@ map<CartItem[]> carts = {};
 map<Order> orders = {};
 
 //the ShoppingService
-service "ShoppingService" on new grpc:Listener(9090) {
+service "ShoppingService" on new http:Listener(9090) {
 
     // Add a product
     remote function addProduct(AddProductRequest request) returns AddProductResponse|error {
